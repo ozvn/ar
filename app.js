@@ -3,10 +3,29 @@
 
   const statusEl = document.getElementById("status");
   const sceneEl = document.getElementById("ar-scene");
+  const SMOOTH_PRESETS = {
+    balanced: {
+      posLerp: 0.18,
+      slowRotLerp: 0.2,
+      fastRotLerp: 0.55,
+      fastRotThresholdDeg: 4,
+      rotDeadzoneDeg: 0.6,
+      scaleLerp: 0.2
+    },
+    stable: {
+      posLerp: 0.12,
+      slowRotLerp: 0.12,
+      fastRotLerp: 0.34,
+      fastRotThresholdDeg: 7,
+      rotDeadzoneDeg: 1.2,
+      scaleLerp: 0.14
+    }
+  };
 
   if (window.AFRAME && !AFRAME.components["marker-smooth"]) {
     AFRAME.registerComponent("marker-smooth", {
       schema: {
+        preset: { type: "string", default: "stable" },
         posLerp: { type: "number", default: 0.18, min: 0.01, max: 1 },
         slowRotLerp: { type: "number", default: 0.2, min: 0.01, max: 1 },
         fastRotLerp: { type: "number", default: 0.55, min: 0.01, max: 1 },
@@ -22,6 +41,11 @@
         this.smoothPosition = new THREE.Vector3();
         this.smoothQuaternion = new THREE.Quaternion();
         this.smoothScale = new THREE.Vector3();
+        this.active = SMOOTH_PRESETS.stable;
+      },
+      update() {
+        const selected = this.data.preset || "stable";
+        this.active = SMOOTH_PRESETS[selected] || SMOOTH_PRESETS.stable;
       },
       tick() {
         const object3D = this.el.object3D;
@@ -42,8 +66,8 @@
           return;
         }
 
-        this.smoothPosition.lerp(this.rawPosition, this.data.posLerp);
-        this.smoothScale.lerp(this.rawScale, this.data.scaleLerp);
+        this.smoothPosition.lerp(this.rawPosition, this.active.posLerp);
+        this.smoothScale.lerp(this.rawScale, this.active.scaleLerp);
 
         // Keep micro jitter out, but react quickly to real camera movement.
         const dot = THREE.MathUtils.clamp(
@@ -52,11 +76,11 @@
           1
         );
         const deltaDeg = THREE.MathUtils.radToDeg(2 * Math.acos(dot));
-        if (deltaDeg > this.data.rotDeadzoneDeg) {
+        if (deltaDeg > this.active.rotDeadzoneDeg) {
           const rotLerp =
-            deltaDeg >= this.data.fastRotThresholdDeg
-              ? this.data.fastRotLerp
-              : this.data.slowRotLerp;
+            deltaDeg >= this.active.fastRotThresholdDeg
+              ? this.active.fastRotLerp
+              : this.active.slowRotLerp;
           this.smoothQuaternion.slerp(this.rawQuaternion, rotLerp);
         }
 
