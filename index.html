@@ -20,7 +20,7 @@
 
     <a-scene
       id="ar-scene"
-      mindar-image="imageTargetSrc: ./targets.mind; maxTrack: 1; autoStart: true; warmupTolerance: 12; missTolerance: 10; filterMinCF: 0.0003; filterBeta: 0.0008"
+      mindar-image="imageTargetSrc: ./targets.mind; maxTrack: 1; autoStart: true; warmupTolerance: 12; missTolerance: 10; filterMinCF: 0.001; filterBeta: 0.01"
       color-space="sRGB"
       renderer="colorManagement: true, physicallyCorrectLights: true"
       vr-mode-ui="enabled: false"
@@ -42,7 +42,7 @@
 
       <a-entity
         mindar-image-target="targetIndex: 0"
-        marker-smooth="posLerp: 0.18; rotLerp: 0.12; scaleLerp: 0.2"
+        marker-smooth="posLerp: 0.18; slowRotLerp: 0.2; fastRotLerp: 0.55; fastRotThresholdDeg: 4; rotDeadzoneDeg: 0.6; scaleLerp: 0.2"
       >
         <a-gltf-model
           src="#modelMain"

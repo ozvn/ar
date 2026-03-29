@@ -8,7 +8,10 @@
     AFRAME.registerComponent("marker-smooth", {
       schema: {
         posLerp: { type: "number", default: 0.18, min: 0.01, max: 1 },
-        rotLerp: { type: "number", default: 0.12, min: 0.01, max: 1 },
+        slowRotLerp: { type: "number", default: 0.2, min: 0.01, max: 1 },
+        fastRotLerp: { type: "number", default: 0.55, min: 0.01, max: 1 },
+        fastRotThresholdDeg: { type: "number", default: 4, min: 0.1, max: 45 },
+        rotDeadzoneDeg: { type: "number", default: 0.6, min: 0, max: 10 },
         scaleLerp: { type: "number", default: 0.2, min: 0.01, max: 1 }
       },
       init() {
@@ -40,8 +43,22 @@
         }
 
         this.smoothPosition.lerp(this.rawPosition, this.data.posLerp);
-        this.smoothQuaternion.slerp(this.rawQuaternion, this.data.rotLerp);
         this.smoothScale.lerp(this.rawScale, this.data.scaleLerp);
+
+        // Keep micro jitter out, but react quickly to real camera movement.
+        const dot = THREE.MathUtils.clamp(
+          Math.abs(this.smoothQuaternion.dot(this.rawQuaternion)),
+          -1,
+          1
+        );
+        const deltaDeg = THREE.MathUtils.radToDeg(2 * Math.acos(dot));
+        if (deltaDeg > this.data.rotDeadzoneDeg) {
+          const rotLerp =
+            deltaDeg >= this.data.fastRotThresholdDeg
+              ? this.data.fastRotLerp
+              : this.data.slowRotLerp;
+          this.smoothQuaternion.slerp(this.rawQuaternion, rotLerp);
+        }
 
         object3D.position.copy(this.smoothPosition);
         object3D.quaternion.copy(this.smoothQuaternion);
