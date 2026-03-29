@@ -7,12 +7,26 @@
   if (window.AFRAME && !AFRAME.components["marker-smooth"]) {
     AFRAME.registerComponent("marker-smooth", {
       schema: {
+        preset: { type: "string", default: "balanced" },
         posLerp: { type: "number", default: 0.18, min: 0.01, max: 1 },
         slowRotLerp: { type: "number", default: 0.2, min: 0.01, max: 1 },
         fastRotLerp: { type: "number", default: 0.55, min: 0.01, max: 1 },
         fastRotThresholdDeg: { type: "number", default: 4, min: 0.1, max: 45 },
         rotDeadzoneDeg: { type: "number", default: 0.6, min: 0, max: 10 },
         scaleLerp: { type: "number", default: 0.2, min: 0.01, max: 1 }
+      },
+      getConfig() {
+        if (this.data.preset === "stable") {
+          return {
+            posLerp: 0.12,
+            slowRotLerp: 0.14,
+            fastRotLerp: 0.35,
+            fastRotThresholdDeg: 6,
+            rotDeadzoneDeg: 1.2,
+            scaleLerp: 0.14
+          };
+        }
+        return this.data;
       },
       init() {
         this.hasPose = false;
@@ -25,6 +39,7 @@
       },
       tick() {
         const object3D = this.el.object3D;
+        const cfg = this.getConfig();
         if (!object3D.visible) {
           this.hasPose = false;
           return;
@@ -42,8 +57,8 @@
           return;
         }
 
-        this.smoothPosition.lerp(this.rawPosition, this.data.posLerp);
-        this.smoothScale.lerp(this.rawScale, this.data.scaleLerp);
+        this.smoothPosition.lerp(this.rawPosition, cfg.posLerp);
+        this.smoothScale.lerp(this.rawScale, cfg.scaleLerp);
 
         // Keep micro jitter out, but react quickly to real camera movement.
         const dot = THREE.MathUtils.clamp(
@@ -52,11 +67,9 @@
           1
         );
         const deltaDeg = THREE.MathUtils.radToDeg(2 * Math.acos(dot));
-        if (deltaDeg > this.data.rotDeadzoneDeg) {
+        if (deltaDeg > cfg.rotDeadzoneDeg) {
           const rotLerp =
-            deltaDeg >= this.data.fastRotThresholdDeg
-              ? this.data.fastRotLerp
-              : this.data.slowRotLerp;
+            deltaDeg >= cfg.fastRotThresholdDeg ? cfg.fastRotLerp : cfg.slowRotLerp;
           this.smoothQuaternion.slerp(this.rawQuaternion, rotLerp);
         }
 
