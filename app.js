@@ -19,10 +19,10 @@
         if (this.data.preset === "stable") {
           return {
             posLerp: 0.12,
-            slowRotLerp: 0.14,
-            fastRotLerp: 0.35,
-            fastRotThresholdDeg: 6,
-            rotDeadzoneDeg: 1.2,
+            slowRotLerp: 0.18,
+            fastRotLerp: 1,
+            fastRotThresholdDeg: 2.8,
+            rotDeadzoneDeg: 0.8,
             scaleLerp: 0.14
           };
         }
@@ -60,7 +60,8 @@
         this.smoothPosition.lerp(this.rawPosition, cfg.posLerp);
         this.smoothScale.lerp(this.rawScale, cfg.scaleLerp);
 
-        // Keep micro jitter out, but react quickly to real camera movement.
+        // Keep micro jitter out. For larger deltas snap to tracker pose
+        // to avoid "camera-facing" lag during fast camera movement.
         const dot = THREE.MathUtils.clamp(
           Math.abs(this.smoothQuaternion.dot(this.rawQuaternion)),
           -1,
@@ -68,9 +69,11 @@
         );
         const deltaDeg = THREE.MathUtils.radToDeg(2 * Math.acos(dot));
         if (deltaDeg > cfg.rotDeadzoneDeg) {
-          const rotLerp =
-            deltaDeg >= cfg.fastRotThresholdDeg ? cfg.fastRotLerp : cfg.slowRotLerp;
-          this.smoothQuaternion.slerp(this.rawQuaternion, rotLerp);
+          if (deltaDeg >= cfg.fastRotThresholdDeg) {
+            this.smoothQuaternion.copy(this.rawQuaternion);
+          } else {
+            this.smoothQuaternion.slerp(this.rawQuaternion, cfg.slowRotLerp);
+          }
         }
 
         object3D.position.copy(this.smoothPosition);
