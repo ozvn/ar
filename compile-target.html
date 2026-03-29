@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Target Derleyici</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: Arial, Helvetica, sans-serif;
+        background: #101214;
+        color: #fff;
+      }
+      .wrap {
+        max-width: 720px;
+        margin: 24px auto;
+        padding: 16px;
+      }
+      .card {
+        background: #1c2025;
+        border-radius: 10px;
+        padding: 14px;
+        margin-bottom: 12px;
+      }
+      img {
+        width: 180px;
+        border-radius: 8px;
+        display: block;
+        margin-top: 10px;
+      }
+      button {
+        background: #2d8cff;
+        color: #fff;
+        border: 0;
+        padding: 10px 12px;
+        border-radius: 8px;
+        cursor: pointer;
+      }
+      button:disabled {
+        opacity: 0.6;
+        cursor: default;
+      }
+      #log {
+        font-size: 14px;
+        margin-top: 8px;
+        white-space: pre-wrap;
+      }
+      a {
+        color: #7ab4ff;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card">
+        <h2>hedef.jpeg -> targets.mind</h2>
+        <p>
+          Bu sayfa `hedef.jpeg` dosyasini MindAR icin derler ve `targets.mind`
+          indirir.
+        </p>
+        <img id="preview" src="./hedef.jpeg" alt="hedef" />
+      </div>
+
+      <div class="card">
+        <button id="compileBtn">Derle ve indir</button>
+        <div id="log">Hazir.</div>
+      </div>
+
+      <div class="card">
+        <p>
+          Indirilen `targets.mind` dosyasini proje klasorune koy:
+          <br />
+          `c:\Users\Wonka\Desktop\ar\targets.mind`
+        </p>
+        <p>Sonra `index.html` ile AR sahnesini ac.</p>
+      </div>
+    </div>
+
+    <script type="module">
+      "use strict";
+      import { Compiler } from "https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image.prod.js";
+
+      const btn = document.getElementById("compileBtn");
+      const log = document.getElementById("log");
+
+      const setLog = (text) => {
+        log.textContent = text;
+      };
+
+      const loadImage = (src) =>
+        new Promise((resolve, reject) => {
+          const img = new Image();
+          img.onload = () => resolve(img);
+          img.onerror = reject;
+          img.src = src;
+        });
+
+      btn.addEventListener("click", async () => {
+        btn.disabled = true;
+        try {
+          if (!Compiler) {
+            throw new Error("MindAR Compiler yuklenemedi");
+          }
+
+          setLog("Gorsel yukleniyor...");
+          const targetImage = await loadImage("./hedef.jpeg");
+
+          setLog("Derleme basladi...");
+          const compiler = new Compiler();
+          await compiler.compileImageTargets([targetImage], (percent) => {
+            setLog(`Derleniyor: %${Math.round(percent * 100)}`);
+          });
+
+          const exportedBuffer = await compiler.exportData();
+          const blob = new Blob([exportedBuffer], {
+            type: "application/octet-stream",
+          });
+          const url = URL.createObjectURL(blob);
+
+          const a = document.createElement("a");
+          a.href = url;
+          a.download = "targets.mind";
+          a.click();
+          URL.revokeObjectURL(url);
+
+          setLog("Tamamlandi. targets.mind indirildi.");
+        } catch (error) {
+          setLog(`Hata: ${error?.message || error}`);
+        } finally {
+          btn.disabled = false;
+        }
+      });
+    </script>
+  </body>
+</html>
