@@ -13,19 +13,104 @@ a-scene {
 }
 
 body {
-  background: #000;
-  font-family: Arial, Helvetica, sans-serif;
+  background: radial-gradient(circle at top, #0b1733 0%, #04070f 42%, #000 100%);
+  font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+  color: #eaf0ff;
+}
+
+.top-brand {
+  position: fixed;
+  top: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 60;
+  pointer-events: none;
+  padding: 8px 14px;
+  border-radius: 999px;
+  border: 1px solid rgba(132, 184, 255, 0.35);
+  background: linear-gradient(135deg, rgba(11, 26, 58, 0.9), rgba(8, 17, 38, 0.78));
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.35);
+}
+
+.top-brand-logo {
+  display: block;
+  height: 42px;
+  width: auto;
+  max-width: 68vw;
+  object-fit: contain;
 }
 
 #status {
   position: fixed;
-  top: 12px;
-  left: 12px;
-  z-index: 10;
-  background: rgba(0, 0, 0, 0.65);
-  color: #fff;
+  top: 76px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 55;
+  min-width: 210px;
+  text-align: center;
+  letter-spacing: 0.2px;
+  background: rgba(7, 14, 30, 0.68);
+  border: 1px solid rgba(149, 196, 255, 0.26);
+  color: #dce9ff;
   font-size: 12px;
-  padding: 6px 8px;
-  border-radius: 6px;
+  padding: 8px 12px;
+  border-radius: 999px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.28);
   pointer-events: none;
+}
+
+/* MindAR default overlays (loading / scanning / camera permission). */
+.mindar-ui-overlay,
+.mindar-ui-loading,
+.mindar-ui-scanning,
+.mindar-ui-compatibility,
+.mindar-ui-error {
+  background: linear-gradient(
+    160deg,
+    rgba(5, 14, 34, 0.94) 0%,
+    rgba(10, 24, 54, 0.9) 45%,
+    rgba(5, 10, 24, 0.94) 100%
+  ) !important;
+  color: #eaf1ff !important;
+  font-family: "Segoe UI", Arial, Helvetica, sans-serif !important;
+}
+
+.mindar-ui-overlay * {
+  box-sizing: border-box;
+}
+
+.mindar-ui-overlay .ui-msg,
+.mindar-ui-loading .loading-text,
+.mindar-ui-scanning .scanning-text,
+.mindar-ui-compatibility .compatibility-text,
+.mindar-ui-error .error-text {
+  color: #eaf1ff !important;
+  text-shadow: none !important;
+  letter-spacing: 0.2px;
+}
+
+.mindar-ui-overlay button,
+.mindar-ui-overlay .ui-btn,
+.mindar-ui-loading button,
+.mindar-ui-scanning button,
+.mindar-ui-compatibility button,
+.mindar-ui-error button {
+  border: 1px solid rgba(160, 204, 255, 0.56) !important;
+  background: linear-gradient(135deg, #1f4fa8 0%, #2866cc 55%, #3f7deb 100%) !important;
+  color: #f5f9ff !important;
+  border-radius: 12px !important;
+  padding: 11px 20px !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.25px !important;
+  box-shadow: 0 12px 26px rgba(16, 37, 79, 0.45) !important;
+}
+
+.mindar-ui-overlay button:hover,
+.mindar-ui-overlay button:focus-visible,
+.mindar-ui-overlay .ui-btn:hover,
+.mindar-ui-overlay .ui-btn:focus-visible {
+  filter: brightness(1.08);
+  outline: none;
 }
