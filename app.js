@@ -125,9 +125,6 @@
 
   const targetEls = sceneEl.querySelectorAll("[mindar-image-target]");
   targetEls.forEach((targetEl) => {
-    targetEl.addEventListener("targetFound", () => {
-      setStatus("Hedef bulundu.");
-    });
     targetEl.addEventListener("targetLost", () => {
       setStatus("Hedef kayboldu.");
     });

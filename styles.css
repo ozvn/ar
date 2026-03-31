@@ -114,3 +114,20 @@ body {
   filter: brightness(1.08);
   outline: none;
 }
+
+/* A-Frame initial loader (light blue by default). */
+div.a-loader {
+  background: linear-gradient(
+    160deg,
+    rgba(5, 14, 34, 0.96) 0%,
+    rgba(10, 24, 54, 0.92) 45%,
+    rgba(5, 10, 24, 0.96) 100%
+  ) !important;
+  background-color: #08162f !important;
+  color: #eaf1ff !important;
+}
+
+.a-loader-title {
+  color: #dce9ff !important;
+  letter-spacing: 0.2px;
+}
