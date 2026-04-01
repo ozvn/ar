@@ -147,6 +147,7 @@
   let recordStartAt = 0;
   let recordMimeType = "video/webm";
   let recordFileExt = "webm";
+  let recorderSession = null;
 
   const clearRecordTimer = () => {
     if (recordTimerId) window.clearInterval(recordTimerId);
@@ -174,17 +175,62 @@
     mediaRecorder.stop();
   };
 
+  const createCompositeRecorderSession = () => {
+    const arCanvas = sceneEl.canvas || sceneEl.querySelector("canvas");
+    if (!arCanvas || typeof arCanvas.captureStream !== "function") return null;
+
+    const cameraVideo = sceneEl.querySelector("video") || document.querySelector("video");
+    const width =
+      (cameraVideo && cameraVideo.videoWidth) ||
+      arCanvas.width ||
+      Math.floor(arCanvas.clientWidth * window.devicePixelRatio) ||
+      720;
+    const height =
+      (cameraVideo && cameraVideo.videoHeight) ||
+      arCanvas.height ||
+      Math.floor(arCanvas.clientHeight * window.devicePixelRatio) ||
+      1280;
+
+    const compositeCanvas = document.createElement("canvas");
+    compositeCanvas.width = width;
+    compositeCanvas.height = height;
+    const compositeCtx = compositeCanvas.getContext("2d", { alpha: false });
+    if (!compositeCtx) return null;
+
+    let rafId = 0;
+    const drawFrame = () => {
+      if (cameraVideo && cameraVideo.readyState >= 2) {
+        compositeCtx.drawImage(cameraVideo, 0, 0, width, height);
+      } else {
+        compositeCtx.fillStyle = "#000";
+        compositeCtx.fillRect(0, 0, width, height);
+      }
+      compositeCtx.drawImage(arCanvas, 0, 0, width, height);
+      rafId = window.requestAnimationFrame(drawFrame);
+    };
+    drawFrame();
+
+    const stream = compositeCanvas.captureStream(30);
+    return {
+      stream,
+      cleanup() {
+        if (rafId) window.cancelAnimationFrame(rafId);
+        stream.getTracks().forEach((track) => track.stop());
+      }
+    };
+  };
+
   const startRecording = () => {
     if (typeof MediaRecorder === "undefined") {
       setStatus("Bu cihazda video kayit desteklenmiyor.");
       return;
     }
-    const canvas = sceneEl.canvas || sceneEl.querySelector("canvas");
-    if (!canvas || typeof canvas.captureStream !== "function") {
+    recorderSession = createCompositeRecorderSession();
+    if (!recorderSession || !recorderSession.stream) {
       setStatus("Video kayit desteklenmiyor.");
       return;
     }
-    const stream = canvas.captureStream(30);
+    const stream = recorderSession.stream;
     recordedChunks = [];
     const preferredTypes = [
       { mimeType: "video/mp4;codecs=avc1.42E01E", ext: "mp4" },
@@ -224,7 +270,8 @@
           setStatus("Kayit indirildi (cihaz MP4'i desteklemedigi icin WEBM).");
         }
       }
-      stream.getTracks().forEach((track) => track.stop());
+      if (recorderSession) recorderSession.cleanup();
+      recorderSession = null;
       mediaRecorder = null;
       recordedChunks = [];
     };
