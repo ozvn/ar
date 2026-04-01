@@ -145,6 +145,8 @@
   let recordedChunks = [];
   let recordTimerId = null;
   let recordStartAt = 0;
+  let recordMimeType = "video/webm";
+  let recordFileExt = "webm";
 
   const clearRecordTimer = () => {
     if (recordTimerId) window.clearInterval(recordTimerId);
@@ -155,12 +157,12 @@
     setTimerText((Date.now() - recordStartAt) / 1000);
   };
 
-  const downloadBlob = (blob) => {
+  const downloadBlob = (blob, extension) => {
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     const stamp = new Date().toISOString().replace(/[:.]/g, "-");
     anchor.href = url;
-    anchor.download = `ar-record-${stamp}.webm`;
+    anchor.download = `ar-record-${stamp}.${extension}`;
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
@@ -184,16 +186,26 @@
     }
     const stream = canvas.captureStream(30);
     recordedChunks = [];
-    const mimeType =
-      typeof MediaRecorder !== "undefined" &&
-      MediaRecorder.isTypeSupported &&
-      MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
-        ? "video/webm;codecs=vp9"
-        : "video/webm";
+    const preferredTypes = [
+      { mimeType: "video/mp4;codecs=avc1.42E01E", ext: "mp4" },
+      { mimeType: "video/mp4", ext: "mp4" },
+      { mimeType: "video/webm;codecs=vp9", ext: "webm" },
+      { mimeType: "video/webm", ext: "webm" }
+    ];
+    const chosenType =
+      preferredTypes.find(
+        (item) =>
+          MediaRecorder.isTypeSupported && MediaRecorder.isTypeSupported(item.mimeType)
+      ) || preferredTypes[preferredTypes.length - 1];
+    const mimeType = chosenType.mimeType;
+    recordMimeType = mimeType;
+    recordFileExt = chosenType.ext;
     try {
       mediaRecorder = new MediaRecorder(stream, { mimeType });
     } catch (error) {
       mediaRecorder = new MediaRecorder(stream);
+      recordMimeType = mediaRecorder.mimeType || "video/webm";
+      recordFileExt = recordMimeType.includes("mp4") ? "mp4" : "webm";
     }
     mediaRecorder.ondataavailable = (event) => {
       if (event.data && event.data.size > 0) recordedChunks.push(event.data);
@@ -204,9 +216,13 @@
       setTimerText(0);
       setRecordUI({ visible: targetVisible, recording: false });
       if (recordedChunks.length) {
-        const blob = new Blob(recordedChunks, { type: "video/webm" });
-        downloadBlob(blob);
-        setStatus("Kayit tamamlandi ve indirildi.");
+        const blob = new Blob(recordedChunks, { type: recordMimeType });
+        downloadBlob(blob, recordFileExt);
+        if (recordFileExt === "mp4") {
+          setStatus("Kayit MP4 olarak indirildi.");
+        } else {
+          setStatus("Kayit indirildi (cihaz MP4'i desteklemedigi icin WEBM).");
+        }
       }
       stream.getTracks().forEach((track) => track.stop());
       mediaRecorder = null;
@@ -219,7 +235,11 @@
     recordTimerId = window.setInterval(updateTimerNow, 250);
     if (timerEl) timerEl.classList.add("active");
     setRecordUI({ visible: true, recording: true });
-    setStatus("Kayit basladi.");
+    if (recordFileExt === "mp4") {
+      setStatus("Kayit basladi (MP4).");
+    } else {
+      setStatus("Kayit basladi (MP4 desteklenmedigi icin WEBM).");
+    }
   };
 
   if (recordBtn) {
