@@ -180,22 +180,31 @@
     if (!arCanvas || typeof arCanvas.captureStream !== "function") return null;
 
     const cameraVideo = sceneEl.querySelector("video") || document.querySelector("video");
-    const width =
-      (cameraVideo && cameraVideo.videoWidth) ||
-      arCanvas.width ||
-      Math.floor(arCanvas.clientWidth * window.devicePixelRatio) ||
-      720;
-    const height =
-      (cameraVideo && cameraVideo.videoHeight) ||
-      arCanvas.height ||
-      Math.floor(arCanvas.clientHeight * window.devicePixelRatio) ||
-      1280;
+    const sourceWidth = Math.max(
+      (cameraVideo && cameraVideo.videoWidth) || 0,
+      arCanvas.width || 0,
+      Math.floor(arCanvas.clientWidth * window.devicePixelRatio) || 0,
+      720
+    );
+    const sourceHeight = Math.max(
+      (cameraVideo && cameraVideo.videoHeight) || 0,
+      arCanvas.height || 0,
+      Math.floor(arCanvas.clientHeight * window.devicePixelRatio) || 0,
+      1280
+    );
+    const longestEdge = Math.max(sourceWidth, sourceHeight);
+    const maxEdge = 1920;
+    const scale = longestEdge > maxEdge ? maxEdge / longestEdge : 1;
+    const width = Math.max(2, Math.floor(sourceWidth * scale));
+    const height = Math.max(2, Math.floor(sourceHeight * scale));
 
     const compositeCanvas = document.createElement("canvas");
     compositeCanvas.width = width;
     compositeCanvas.height = height;
     const compositeCtx = compositeCanvas.getContext("2d", { alpha: false });
     if (!compositeCtx) return null;
+    compositeCtx.imageSmoothingEnabled = true;
+    compositeCtx.imageSmoothingQuality = "high";
 
     let rafId = 0;
     const drawFrame = () => {
@@ -213,14 +222,23 @@
     const stream = compositeCanvas.captureStream(30);
     return {
       stream,
+      microphoneStream: null,
+      attachMicrophoneStream(micStream) {
+        this.microphoneStream = micStream;
+        const audioTrack = micStream.getAudioTracks()[0];
+        if (audioTrack) stream.addTrack(audioTrack);
+      },
       cleanup() {
         if (rafId) window.cancelAnimationFrame(rafId);
+        if (this.microphoneStream) {
+          this.microphoneStream.getTracks().forEach((track) => track.stop());
+        }
         stream.getTracks().forEach((track) => track.stop());
       }
     };
   };
 
-  const startRecording = () => {
+  const startRecording = async () => {
     if (typeof MediaRecorder === "undefined") {
       setStatus("Bu cihazda video kayit desteklenmiyor.");
       return;
@@ -231,6 +249,23 @@
       return;
     }
     const stream = recorderSession.stream;
+    let hasAudio = false;
+    if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
+      try {
+        const micStream = await navigator.mediaDevices.getUserMedia({
+          audio: {
+            echoCancellation: true,
+            noiseSuppression: true,
+            autoGainControl: true
+          },
+          video: false
+        });
+        recorderSession.attachMicrophoneStream(micStream);
+        hasAudio = micStream.getAudioTracks().length > 0;
+      } catch (error) {
+        hasAudio = false;
+      }
+    }
     recordedChunks = [];
     const preferredTypes = [
       { mimeType: "video/mp4;codecs=avc1.42E01E", ext: "mp4" },
@@ -247,10 +282,20 @@
     recordMimeType = mimeType;
     recordFileExt = chosenType.ext;
     try {
-      mediaRecorder = new MediaRecorder(stream, { mimeType });
+      mediaRecorder = new MediaRecorder(stream, {
+        mimeType,
+        videoBitsPerSecond: 8_000_000,
+        audioBitsPerSecond: 128_000
+      });
     } catch (error) {
-      mediaRecorder = new MediaRecorder(stream);
-      recordMimeType = mediaRecorder.mimeType || "video/webm";
+      try {
+        mediaRecorder = new MediaRecorder(stream, { mimeType });
+      } catch (fallbackError) {
+        mediaRecorder = new MediaRecorder(stream);
+      }
+    }
+    if (mediaRecorder) {
+      recordMimeType = mediaRecorder.mimeType || recordMimeType;
       recordFileExt = recordMimeType.includes("mp4") ? "mp4" : "webm";
     }
     mediaRecorder.ondataavailable = (event) => {
@@ -282,10 +327,14 @@
     recordTimerId = window.setInterval(updateTimerNow, 250);
     if (timerEl) timerEl.classList.add("active");
     setRecordUI({ visible: true, recording: true });
-    if (recordFileExt === "mp4") {
-      setStatus("Kayit basladi (MP4).");
+    if (recordFileExt === "mp4" && hasAudio) {
+      setStatus("Kayit basladi (MP4 + ses).");
+    } else if (recordFileExt === "mp4") {
+      setStatus("Kayit basladi (MP4, ses izni yok).");
+    } else if (hasAudio) {
+      setStatus("Kayit basladi (WEBM + ses).");
     } else {
-      setStatus("Kayit basladi (MP4 desteklenmedigi icin WEBM).");
+      setStatus("Kayit basladi (WEBM, ses izni yok).");
     }
   };
 
