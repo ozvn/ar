@@ -61,6 +61,53 @@ body {
   pointer-events: none;
 }
 
+#record-timer {
+  position: fixed;
+  top: 76px;
+  right: 12px;
+  z-index: 56;
+  background: rgba(9, 20, 43, 0.78);
+  border: 1px solid rgba(255, 120, 120, 0.45);
+  color: #ffd5d5;
+  font-size: 12px;
+  font-weight: 600;
+  padding: 7px 10px;
+  border-radius: 999px;
+  letter-spacing: 0.3px;
+  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.28);
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.18s ease, transform 0.18s ease;
+  pointer-events: none;
+}
+
+#record-timer.active {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+#record-btn {
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 56;
+  border: 1px solid rgba(160, 204, 255, 0.56);
+  background: linear-gradient(135deg, #1f4fa8 0%, #2866cc 55%, #3f7deb 100%);
+  color: #f5f9ff;
+  border-radius: 999px;
+  padding: 12px 20px;
+  font-weight: 600;
+  letter-spacing: 0.2px;
+  box-shadow: 0 12px 26px rgba(16, 37, 79, 0.45);
+  cursor: pointer;
+}
+
+#record-btn.recording {
+  background: linear-gradient(135deg, #9d1d2b 0%, #cb2435 55%, #e04b5a 100%);
+  border-color: rgba(255, 171, 171, 0.6);
+}
+
 /* MindAR default overlays (loading / scanning / camera permission). */
 .mindar-ui-overlay,
 .mindar-ui-loading,

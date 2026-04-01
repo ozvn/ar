@@ -3,6 +3,8 @@
 
   const statusEl = document.getElementById("status");
   const sceneEl = document.getElementById("ar-scene");
+  const recordBtn = document.getElementById("record-btn");
+  const timerEl = document.getElementById("record-timer");
 
   if (window.AFRAME && !AFRAME.components["marker-smooth"]) {
     AFRAME.registerComponent("marker-smooth", {
@@ -87,6 +89,21 @@
     if (statusEl) statusEl.textContent = message;
   };
 
+  const setRecordUI = ({ visible, recording }) => {
+    if (!recordBtn) return;
+    recordBtn.hidden = !visible;
+    recordBtn.classList.toggle("recording", Boolean(recording));
+    recordBtn.textContent = recording ? "Kaydi Durdur" : "Video Kaydet";
+  };
+
+  const setTimerText = (seconds) => {
+    if (!timerEl) return;
+    const safeSeconds = Math.max(0, Math.floor(seconds));
+    const mm = String(Math.floor(safeSeconds / 60)).padStart(2, "0");
+    const ss = String(safeSeconds % 60).padStart(2, "0");
+    timerEl.textContent = `REC ${mm}:${ss}`;
+  };
+
   const preventGesture = (event) => {
     const multiTouch = event.touches && event.touches.length > 1;
     const scaled = typeof event.scale === "number" && event.scale !== 1;
@@ -123,10 +140,115 @@
 
   if (!sceneEl) return;
 
+  let targetVisible = false;
+  let mediaRecorder = null;
+  let recordedChunks = [];
+  let recordTimerId = null;
+  let recordStartAt = 0;
+
+  const clearRecordTimer = () => {
+    if (recordTimerId) window.clearInterval(recordTimerId);
+    recordTimerId = null;
+  };
+
+  const updateTimerNow = () => {
+    setTimerText((Date.now() - recordStartAt) / 1000);
+  };
+
+  const downloadBlob = (blob) => {
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    const stamp = new Date().toISOString().replace(/[:.]/g, "-");
+    anchor.href = url;
+    anchor.download = `ar-record-${stamp}.webm`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  };
+
+  const stopRecording = () => {
+    if (!mediaRecorder || mediaRecorder.state !== "recording") return;
+    mediaRecorder.stop();
+  };
+
+  const startRecording = () => {
+    if (typeof MediaRecorder === "undefined") {
+      setStatus("Bu cihazda video kayit desteklenmiyor.");
+      return;
+    }
+    const canvas = sceneEl.canvas || sceneEl.querySelector("canvas");
+    if (!canvas || typeof canvas.captureStream !== "function") {
+      setStatus("Video kayit desteklenmiyor.");
+      return;
+    }
+    const stream = canvas.captureStream(30);
+    recordedChunks = [];
+    const mimeType =
+      typeof MediaRecorder !== "undefined" &&
+      MediaRecorder.isTypeSupported &&
+      MediaRecorder.isTypeSupported("video/webm;codecs=vp9")
+        ? "video/webm;codecs=vp9"
+        : "video/webm";
+    try {
+      mediaRecorder = new MediaRecorder(stream, { mimeType });
+    } catch (error) {
+      mediaRecorder = new MediaRecorder(stream);
+    }
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data && event.data.size > 0) recordedChunks.push(event.data);
+    };
+    mediaRecorder.onstop = () => {
+      clearRecordTimer();
+      if (timerEl) timerEl.classList.remove("active");
+      setTimerText(0);
+      setRecordUI({ visible: targetVisible, recording: false });
+      if (recordedChunks.length) {
+        const blob = new Blob(recordedChunks, { type: "video/webm" });
+        downloadBlob(blob);
+        setStatus("Kayit tamamlandi ve indirildi.");
+      }
+      stream.getTracks().forEach((track) => track.stop());
+      mediaRecorder = null;
+      recordedChunks = [];
+    };
+    mediaRecorder.start(100);
+    recordStartAt = Date.now();
+    updateTimerNow();
+    clearRecordTimer();
+    recordTimerId = window.setInterval(updateTimerNow, 250);
+    if (timerEl) timerEl.classList.add("active");
+    setRecordUI({ visible: true, recording: true });
+    setStatus("Kayit basladi.");
+  };
+
+  if (recordBtn) {
+    setRecordUI({ visible: false, recording: false });
+    recordBtn.addEventListener("click", () => {
+      if (mediaRecorder && mediaRecorder.state === "recording") {
+        stopRecording();
+      } else {
+        startRecording();
+      }
+    });
+  }
+  setTimerText(0);
+
   const targetEls = sceneEl.querySelectorAll("[mindar-image-target]");
   targetEls.forEach((targetEl) => {
+    targetEl.addEventListener("targetFound", () => {
+      targetVisible = true;
+      setStatus("Hedef bulundu. Kayit baslatabilirsiniz.");
+      if (!mediaRecorder || mediaRecorder.state !== "recording") {
+        setRecordUI({ visible: true, recording: false });
+      }
+    });
     targetEl.addEventListener("targetLost", () => {
+      targetVisible = false;
       setStatus("Hedef kayboldu.");
+      if (!mediaRecorder || mediaRecorder.state !== "recording") {
+        setRecordUI({ visible: false, recording: false });
+      }
     });
   });
 
