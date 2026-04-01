@@ -148,8 +148,8 @@
   let recordMimeType = "video/webm";
   let recordFileExt = "webm";
   let recorderSession = null;
-  const RECORD_FPS = 60;
-  const RECORD_MAX_EDGE = 2560;
+  const RECORD_FPS = 30;
+  const RECORD_MAX_EDGE = 1920;
 
   const clearRecordTimer = () => {
     if (recordTimerId) window.clearInterval(recordTimerId);
@@ -208,7 +208,14 @@
     compositeCtx.imageSmoothingQuality = "high";
 
     let rafId = 0;
-    const drawFrame = () => {
+    const frameIntervalMs = 1000 / RECORD_FPS;
+    let lastDrawAt = 0;
+    const drawFrame = (now = 0) => {
+      if (now - lastDrawAt < frameIntervalMs) {
+        rafId = window.requestAnimationFrame(drawFrame);
+        return;
+      }
+      lastDrawAt = now;
       if (cameraVideo && cameraVideo.readyState >= 2) {
         compositeCtx.drawImage(cameraVideo, 0, 0, width, height);
       } else {
@@ -291,8 +298,9 @@
     recordMimeType = mimeType;
     recordFileExt = chosenType.ext;
     const pixelCount = getTrackPixelCount(stream.getVideoTracks()[0]);
-    const targetVideoBitrate =
-      pixelCount > 0 ? Math.max(10_000_000, Math.floor(pixelCount * RECORD_FPS * 0.09)) : 12_000_000;
+    const targetVideoBitrate = pixelCount > 0
+      ? Math.min(14_000_000, Math.max(6_000_000, Math.floor(pixelCount * RECORD_FPS * 0.06)))
+      : 8_000_000;
     try {
       mediaRecorder = new MediaRecorder(stream, {
         mimeType,
@@ -332,7 +340,8 @@
       mediaRecorder = null;
       recordedChunks = [];
     };
-    mediaRecorder.start();
+    // Flush chunks periodically to reduce encoder/backpressure freezes on mobile.
+    mediaRecorder.start(1000);
     recordStartAt = Date.now();
     updateTimerNow();
     clearRecordTimer();
