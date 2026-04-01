@@ -148,6 +148,8 @@
   let recordMimeType = "video/webm";
   let recordFileExt = "webm";
   let recorderSession = null;
+  const RECORD_FPS = 60;
+  const RECORD_MAX_EDGE = 2560;
 
   const clearRecordTimer = () => {
     if (recordTimerId) window.clearInterval(recordTimerId);
@@ -193,8 +195,7 @@
       1280
     );
     const longestEdge = Math.max(sourceWidth, sourceHeight);
-    const maxEdge = 1920;
-    const scale = longestEdge > maxEdge ? maxEdge / longestEdge : 1;
+    const scale = longestEdge > RECORD_MAX_EDGE ? RECORD_MAX_EDGE / longestEdge : 1;
     const width = Math.max(2, Math.floor(sourceWidth * scale));
     const height = Math.max(2, Math.floor(sourceHeight * scale));
 
@@ -219,7 +220,7 @@
     };
     drawFrame();
 
-    const stream = compositeCanvas.captureStream(30);
+    const stream = compositeCanvas.captureStream(RECORD_FPS);
     return {
       stream,
       microphoneStream: null,
@@ -236,6 +237,14 @@
         stream.getTracks().forEach((track) => track.stop());
       }
     };
+  };
+
+  const getTrackPixelCount = (videoTrack) => {
+    if (!videoTrack || typeof videoTrack.getSettings !== "function") return 0;
+    const settings = videoTrack.getSettings();
+    const w = Number(settings.width) || 0;
+    const h = Number(settings.height) || 0;
+    return w > 0 && h > 0 ? w * h : 0;
   };
 
   const startRecording = async () => {
@@ -281,10 +290,13 @@
     const mimeType = chosenType.mimeType;
     recordMimeType = mimeType;
     recordFileExt = chosenType.ext;
+    const pixelCount = getTrackPixelCount(stream.getVideoTracks()[0]);
+    const targetVideoBitrate =
+      pixelCount > 0 ? Math.max(10_000_000, Math.floor(pixelCount * RECORD_FPS * 0.09)) : 12_000_000;
     try {
       mediaRecorder = new MediaRecorder(stream, {
         mimeType,
-        videoBitsPerSecond: 8_000_000,
+        videoBitsPerSecond: targetVideoBitrate,
         audioBitsPerSecond: 128_000
       });
     } catch (error) {
@@ -320,7 +332,7 @@
       mediaRecorder = null;
       recordedChunks = [];
     };
-    mediaRecorder.start(100);
+    mediaRecorder.start();
     recordStartAt = Date.now();
     updateTimerNow();
     clearRecordTimer();
