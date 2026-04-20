@@ -54,6 +54,7 @@
         offsetX: { type: "number", default: 0 },
         offsetY: { type: "number", default: 0 },
         offsetZ: { type: "number", default: 0 },
+        maxShift: { type: "number", default: 0.6 },
         rotX: { type: "number", default: 0 },
         rotY: { type: "number", default: 0 },
         rotZ: { type: "number", default: 0 },
@@ -116,10 +117,16 @@
         if (!bounds || bounds.isEmpty()) return;
 
         bounds.getCenter(this.center);
+        const x = this.data.offsetX - this.center.x;
+        const y = this.data.offsetY - this.center.y;
+        const z = this.data.offsetZ - this.center.z;
+        if (!Number.isFinite(x) || !Number.isFinite(y) || !Number.isFinite(z)) return;
+
+        const maxShift = Math.max(0, this.data.maxShift);
         this.el.object3D.position.set(
-          this.data.offsetX - this.center.x,
-          this.data.offsetY - this.center.y,
-          this.data.offsetZ - this.center.z
+          THREE.MathUtils.clamp(x, -maxShift, maxShift),
+          THREE.MathUtils.clamp(y, -maxShift, maxShift),
+          THREE.MathUtils.clamp(z, -maxShift, maxShift)
         );
       },
       enforceRotation: function () {
@@ -175,7 +182,7 @@
         position="0 0 0"
         rotation="0 0 0"
         scale="1.44 1.44 1.44"
-        auto-center="offsetX: 0; offsetY: 0; offsetZ: 0; rotX: 0; rotY: 0; rotZ: 0; rotToleranceDeg: 0.1; checkEveryMs: 250"
+        auto-center="offsetX: 0; offsetY: 0; offsetZ: 0; maxShift: 0.6; rotX: 0; rotY: 0; rotZ: 0; rotToleranceDeg: 0.1; checkEveryMs: 250"
         animation-mixer="clip: *; loop: repeat; repetitions: Infinity"
       ></a-gltf-model>
     </a-entity>
