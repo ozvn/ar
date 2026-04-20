@@ -99,7 +99,7 @@
         const minY = this.getLocalMinY(mesh);
         if (minY === null || !Number.isFinite(minY)) return;
 
-        this.el.object3D.position.y += this.data.groundY - minY;
+        this.el.object3D.position.y = this.data.groundY - minY;
       },
       tick: function (time) {
         if (time < this.nextCheck) return;
