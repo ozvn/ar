@@ -48,33 +48,49 @@
       }
     });
 
-    // Keep model base on target plane even after internal transform drift.
-    AFRAME.registerComponent("auto-ground", {
+    // Keep model center aligned to image target center.
+    AFRAME.registerComponent("auto-center", {
       schema: {
-        groundY: { type: "number", default: 0 },
+        offsetX: { type: "number", default: 0 },
+        offsetY: { type: "number", default: 0 },
+        offsetZ: { type: "number", default: 0 },
+        rotX: { type: "number", default: 0 },
+        rotY: { type: "number", default: 0 },
+        rotZ: { type: "number", default: 0 },
+        rotToleranceDeg: { type: "number", default: 0.1 },
         checkEveryMs: { type: "number", default: 250 }
       },
       init: function () {
         this.box = new THREE.Box3();
+        this.center = new THREE.Vector3();
         this.localBox = new THREE.Box3();
         this.invRootMatrix = new THREE.Matrix4();
         this.localMatrix = new THREE.Matrix4();
         this.nextCheck = 0;
         this.onModelReady = this.onModelReady.bind(this);
+        this.targetQuat = new THREE.Quaternion().setFromEuler(
+          new THREE.Euler(
+            THREE.MathUtils.degToRad(this.data.rotX),
+            THREE.MathUtils.degToRad(this.data.rotY),
+            THREE.MathUtils.degToRad(this.data.rotZ),
+            "XYZ"
+          )
+        );
         this.el.addEventListener("model-loaded", this.onModelReady);
       },
       remove: function () {
         this.el.removeEventListener("model-loaded", this.onModelReady);
       },
       onModelReady: function () {
-        this.alignToGround();
+        this.alignToCenter();
+        this.enforceRotation();
       },
-      getLocalMinY: function (mesh) {
+      getLocalBounds: function (mesh) {
         mesh.updateMatrixWorld(true);
         this.invRootMatrix.copy(mesh.matrixWorld).invert();
 
         let found = false;
-        let minY = Infinity;
+        this.box.makeEmpty();
         mesh.traverse((node) => {
           if (!node.isMesh || !node.geometry) return;
 
@@ -86,25 +102,43 @@
           this.localBox.copy(node.geometry.boundingBox);
           this.localMatrix.multiplyMatrices(this.invRootMatrix, node.matrixWorld);
           this.localBox.applyMatrix4(this.localMatrix);
-          minY = Math.min(minY, this.localBox.min.y);
+          this.box.union(this.localBox);
           found = true;
         });
 
-        return found ? minY : null;
+        return found ? this.box : null;
       },
-      alignToGround: function () {
+      alignToCenter: function () {
         const mesh = this.el.getObject3D("mesh");
         if (!mesh) return;
 
-        const minY = this.getLocalMinY(mesh);
-        if (minY === null || !Number.isFinite(minY)) return;
+        const bounds = this.getLocalBounds(mesh);
+        if (!bounds || bounds.isEmpty()) return;
 
-        this.el.object3D.position.y = this.data.groundY - minY;
+        bounds.getCenter(this.center);
+        this.el.object3D.position.set(
+          this.data.offsetX - this.center.x,
+          this.data.offsetY - this.center.y,
+          this.data.offsetZ - this.center.z
+        );
+      },
+      enforceRotation: function () {
+        const tolerance = THREE.MathUtils.degToRad(this.data.rotToleranceDeg);
+        const current = this.el.object3D.quaternion;
+        if (current.angleTo(this.targetQuat) <= tolerance) return;
+
+        current.copy(this.targetQuat);
+        this.el.object3D.rotation.set(
+          THREE.MathUtils.degToRad(this.data.rotX),
+          THREE.MathUtils.degToRad(this.data.rotY),
+          THREE.MathUtils.degToRad(this.data.rotZ)
+        );
       },
       tick: function (time) {
         if (time < this.nextCheck) return;
         this.nextCheck = time + this.data.checkEveryMs;
-        this.alignToGround();
+        this.alignToCenter();
+        this.enforceRotation();
       }
     });
   </script>
@@ -141,8 +175,7 @@
         position="0 0 0"
         rotation="0 0 0"
         scale="1.44 1.44 1.44"
-        pose-guardian="x: 0; y: 0; z: 0"
-        auto-ground="groundY: 0; checkEveryMs: 250"
+        auto-center="offsetX: 0; offsetY: 0; offsetZ: 0; rotX: 0; rotY: 0; rotZ: 0; rotToleranceDeg: 0.1; checkEveryMs: 250"
         animation-mixer="clip: *; loop: repeat; repetitions: Infinity"
       ></a-gltf-model>
     </a-entity>
