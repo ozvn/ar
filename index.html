@@ -9,19 +9,102 @@
   <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v7.0.0/dist/aframe-extras.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
   <script>
-    // Keep tracked target rotation fixed to prevent camera-facing flips.
-    AFRAME.registerComponent("lock-rotation", {
+    // Enforce fixed rotation continuously to self-heal tracking flips.
+    AFRAME.registerComponent("pose-guardian", {
       schema: {
         x: { type: "number", default: 0 },
         y: { type: "number", default: 0 },
-        z: { type: "number", default: 0 }
+        z: { type: "number", default: 0 },
+        toleranceDeg: { type: "number", default: 0.05 }
+      },
+      init: function () {
+        this.targetQuat = new THREE.Quaternion().setFromEuler(
+          new THREE.Euler(
+            THREE.MathUtils.degToRad(this.data.x),
+            THREE.MathUtils.degToRad(this.data.y),
+            THREE.MathUtils.degToRad(this.data.z),
+            "XYZ"
+          )
+        );
+      },
+      enforce: function () {
+        const current = this.el.object3D.quaternion;
+        const angle = current.angleTo(this.targetQuat);
+        const tolerance = THREE.MathUtils.degToRad(this.data.toleranceDeg);
+        if (angle > tolerance) {
+          current.copy(this.targetQuat);
+          this.el.object3D.rotation.set(
+            THREE.MathUtils.degToRad(this.data.x),
+            THREE.MathUtils.degToRad(this.data.y),
+            THREE.MathUtils.degToRad(this.data.z)
+          );
+        }
       },
       tick: function () {
-        this.el.object3D.rotation.set(
-          THREE.MathUtils.degToRad(this.data.x),
-          THREE.MathUtils.degToRad(this.data.y),
-          THREE.MathUtils.degToRad(this.data.z)
-        );
+        this.enforce();
+      },
+      tock: function () {
+        this.enforce();
+      }
+    });
+
+    // Keep model base on target plane even after internal transform drift.
+    AFRAME.registerComponent("auto-ground", {
+      schema: {
+        groundY: { type: "number", default: 0 },
+        checkEveryMs: { type: "number", default: 250 }
+      },
+      init: function () {
+        this.box = new THREE.Box3();
+        this.localBox = new THREE.Box3();
+        this.invRootMatrix = new THREE.Matrix4();
+        this.localMatrix = new THREE.Matrix4();
+        this.nextCheck = 0;
+        this.onModelReady = this.onModelReady.bind(this);
+        this.el.addEventListener("model-loaded", this.onModelReady);
+      },
+      remove: function () {
+        this.el.removeEventListener("model-loaded", this.onModelReady);
+      },
+      onModelReady: function () {
+        this.alignToGround();
+      },
+      getLocalMinY: function (mesh) {
+        mesh.updateMatrixWorld(true);
+        this.invRootMatrix.copy(mesh.matrixWorld).invert();
+
+        let found = false;
+        let minY = Infinity;
+        mesh.traverse((node) => {
+          if (!node.isMesh || !node.geometry) return;
+
+          if (!node.geometry.boundingBox) {
+            node.geometry.computeBoundingBox();
+          }
+          if (!node.geometry.boundingBox) return;
+
+          this.localBox.copy(node.geometry.boundingBox);
+          this.localMatrix.multiplyMatrices(this.invRootMatrix, node.matrixWorld);
+          this.localBox.applyMatrix4(this.localMatrix);
+          minY = Math.min(minY, this.localBox.min.y);
+          found = true;
+        });
+
+        return found ? minY : null;
+      },
+      alignToGround: function () {
+        const mesh = this.el.getObject3D("mesh");
+        if (!mesh) return;
+
+        const minY = this.getLocalMinY(mesh);
+        if (minY === null || !Number.isFinite(minY)) return;
+
+        this.el.object3D.position.y += this.data.groundY - minY;
+      },
+      tick: function (time) {
+        if (time < this.nextCheck) return;
+        this.nextCheck = time + this.data.checkEveryMs;
+        this.alignToGround();
       }
     });
   </script>
@@ -50,14 +133,16 @@
 
     <a-entity
       mindar-image-target="targetIndex: 0"
-      lock-rotation="x: 0; y: 0; z: 0"
+      pose-guardian="x: 0; y: 0; z: 0"
       marker-smooth="preset: stable; posLerp: 0.1; slowRotLerp: 0.12; fastRotLerp: 0.35; fastRotThresholdDeg: 3; rotDeadzoneDeg: 1.1; scaleLerp: 0.1"
     >
       <a-gltf-model
         src="#modelMain"
-        position="0 -0.16 0"
+        position="0 0 0"
         rotation="0 0 0"
         scale="1.44 1.44 1.44"
+        pose-guardian="x: 0; y: 0; z: 0"
+        auto-ground="groundY: 0; checkEveryMs: 250"
         animation-mixer="clip: *; loop: repeat; repetitions: Infinity"
       ></a-gltf-model>
     </a-entity>
