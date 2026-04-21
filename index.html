@@ -9,6 +9,29 @@
   <script src="https://cdn.jsdelivr.net/gh/donmccurdy/aframe-extras@v7.0.0/dist/aframe-extras.min.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
   <script>
+    // Suppress only the "target found" status message in UI.
+    document.addEventListener("DOMContentLoaded", function () {
+      const status = document.getElementById("status");
+      if (!status) return;
+
+      let lastText = status.textContent || "";
+      const observer = new MutationObserver(() => {
+        const current = (status.textContent || "").trim();
+        if (current === "Hedef bulundu.") {
+          status.textContent = lastText;
+          return;
+        }
+        lastText = current;
+      });
+
+      observer.observe(status, {
+        childList: true,
+        characterData: true,
+        subtree: true
+      });
+    });
+  </script>
+  <script>
     // Enforce fixed rotation continuously to self-heal tracking flips.
     AFRAME.registerComponent("pose-guardian", {
       schema: {
